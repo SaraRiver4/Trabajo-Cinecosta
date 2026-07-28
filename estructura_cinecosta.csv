@@ -1,9 +1,41 @@
+teatro,ciudad,sala,tamano,precio_base
 Teatro Centro,Barranquilla,Sala 1,A,12000
-Teatro Centro,Barranquilla,Sala 2,B,14000
-Teatro Norte,Santa Marta,Sala 1,C,15000
-Teatro Norte,Santa Marta,Sala 2,A,11000
-Teatro Plaza,Cartagena,Sala 1,B,13000
-Teatro Plaza,Cartagena,Sala 2,D,13000
-Teatro Plaza,Cartagena,Sala 3,A,-5000
-Teatro Centro,Barranquilla,Sala 3,B,abc
-Teatro Norte,Santa Marta,Sala 3,C
+Teatro Centro,Barranquilla,Sala 2,B,15000
+Teatro Centro,Barranquilla,Sala 3,C,18000
+Teatro Centro,Barranquilla,Sala VIP,A,25000
+Teatro Norte,Barranquilla,Sala 1,A,11000
+Teatro Norte,Barranquilla,Sala 2,B,14000
+Teatro Norte,Barranquilla,Sala Max,C,20000
+Teatro Portal,Barranquilla,Sala 1,A,12500
+Teatro Portal,Barranquilla,Sala 2,B,15500
+Teatro Portal,Barranquilla,Sala 3,B,15500
+Teatro Portal,Barranquilla,Sala 4,C,19000
+Teatro Marina,Santa Marta,Sala 1,A,10000
+Teatro Marina,Santa Marta,Sala 2,A,10000
+Teatro Marina,Santa Marta,Sala 3,B,13500
+Teatro Marina,Santa Marta,Sala 4,C,17000
+Teatro Rodadero,Santa Marta,Sala Principal,B,15000
+Teatro Rodadero,Santa Marta,Sala 2,A,11000
+Teatro Rodadero,Santa Marta,Sala 3,C,18000
+Teatro Ocean,Santa Marta,Sala 1,A,12000
+Teatro Ocean,Santa Marta,Sala 2,B,16000
+Teatro Bocagrande,Cartagena,Sala 1,B,16000
+Teatro Bocagrande,Cartagena,Sala 2,B,16000
+Teatro Bocagrande,Cartagena,Sala 3,C,22000
+Teatro Bocagrande,Cartagena,Sala VIP,A,28000
+Teatro Castillo,Cartagena,Sala 1,A,11500
+Teatro Castillo,Cartagena,Sala 2,B,14500
+Teatro Castillo,Cartagena,Sala 3,C,18500
+Teatro Amboy,Cartagena,Sala 1,A,13000
+Teatro Amboy,Cartagena,Sala 2,C,20000
+Teatro Valle,Valledupar,Sala 1,A,9500
+Teatro Valle,Valledupar,Sala 2,B,12500
+Teatro Valle,Valledupar,Sala 3,C,16000
+Teatro Guatapurí,Valledupar,Sala 1,A,10500
+Teatro Guatapurí,Valledupar,Sala 2,B,13500
+Teatro Sinú,Montería,Sala 1,A,10000
+Teatro Sinú,Montería,Sala 2,B,13000
+Teatro Sinú,Montería,Sala 3,C,16500
+Teatro Alamedas,Montería,Sala 1,A,11000
+Teatro Alamedas,Montería,Sala 2,B,14000
+Teatro Alamedas,Montería,Sala 3,C,17500
