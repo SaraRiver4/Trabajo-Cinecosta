@@ -29,6 +29,11 @@ TOTAL_ZONAS = 4
 
 NOMBRE_ZONAS = ["Economica", "Premium", "Intermedia", "Ultima fila"]
 
+SEXO_M = 0
+SEXO_F = 1
+TOTAL_SEXOS = 2
+SEXOS_VALIDOS = ["M", "F"]
+
 ZONAS_POR_TAMANO = {
     "A": {
         ZONA_ECONOMICA: (0, 2),
@@ -54,28 +59,31 @@ ZONAS_POR_TAMANO = {
 class Sala:
 
     def __init__(self, nombre, tamano, precio_base):
-        self.establecer_nombre(nombre)
-        self.establecer_tamaño(tamano)
-        self.establecer_precio_base(precio_base)
+        self._establecer_nombre(nombre)
+        self._establecer_tamano(tamano)
+        self._establecer_precio_base(precio_base)
         self.filas, self.sillas = DIMENSIONES_POR_TAMANO[self.tamano]
         self.zonas = ZONAS_POR_TAMANO[self.tamano]
-        self.mapa_precios = self.construir_mapa_precios()
+        self.mapa_precios = self._construir_mapa_precios()
         self.mapa_ocupacion = None
         self.mapa_ingresos = None
         self.matriz_ocupacion_diaria = None
         self.proyecciones_diarias = []
         self.matriz_ocupacion_mensual = None
         self.fechas_mensuales = []
-        self.entradas = []
+        self.matriz_demanda_sexo = None
+        self.fechas_demanda_sexo = []
+        self.errores_demanda_sexo = []
+        self._entradas = []
 
-    def establecer_nombre(self, nombre):
+    def _establecer_nombre(self, nombre):
         if not isinstance(nombre, str):
             raise TypeError("El nombre de la sala debe ser un texto.")
         if nombre.strip() == "":
             raise ValueError("El nombre de la sala no puede estar vacio.")
         self.nombre = nombre.strip()
 
-    def establecer_tamaño(self, tamano):
+    def _establecer_tamano(self, tamano):
         if not isinstance(tamano, str):
             raise TypeError("El tamano de la sala debe ser un texto.")
         tamano = tamano.strip().upper()
@@ -83,7 +91,7 @@ class Sala:
             raise ValueError("El tamano de la sala debe ser A, B o C.")
         self.tamano = tamano
 
-    def establecer_precio_base(self, precio_base):
+    def _establecer_precio_base(self, precio_base):
         if isinstance(precio_base, bool):
             raise TypeError("El precio base debe ser numerico.")
         if not isinstance(precio_base, (int, float)):
@@ -92,7 +100,7 @@ class Sala:
             raise ValueError("El precio base debe ser mayor que cero.")
         self.precio_base = float(precio_base)
 
-    def construir_mapa_precios(self):
+    def _construir_mapa_precios(self):
         mapa = np.zeros((self.filas, self.sillas), dtype=float)
         for zona, limites in self.zonas.items():
             inicio = limites[0]
@@ -108,17 +116,17 @@ class Sala:
             mapa[inicio:fin + 1, :] = self.precio_base * factor
         return mapa
 
-    def zona_de_fila(self, indice_fila):
+    def _zona_de_fila(self, indice_fila):
         for zona, limites in self.zonas.items():
             if limites[0] <= indice_fila <= limites[1]:
                 return zona
         raise ValueError("La fila esta fuera del rango de la sala.")
 
-    def verificar_ocupacion_cargada(self):
+    def _verificar_ocupacion_cargada(self):
         if self.mapa_ocupacion is None:
             raise ValueError("Primero debe cargar el mapa de ocupacion.")
 
-    def verificar_ingresos_construidos(self):
+    def _verificar_ingresos_construidos(self):
         if self.mapa_ingresos is None:
             raise ValueError("Primero debe construir el mapa de ingresos.")
 
@@ -129,17 +137,20 @@ class Sala:
         self.proyecciones_diarias = []
         self.matriz_ocupacion_mensual = None
         self.fechas_mensuales = []
-        self.entradas = []
+        self.matriz_demanda_sexo = None
+        self.fechas_demanda_sexo = []
+        self.errores_demanda_sexo = []
+        self._entradas = []
 
     def agregar_entrada(self, entrada):
-        self.entradas.append(entrada)
+        self._entradas.append(entrada)
 
     def cargar_mapa_ocupacion(self):
         mapa = np.zeros((self.filas, self.sillas), dtype=int)
         entradas_validas = []
         errores = []
 
-        for entrada in self.entradas:
+        for entrada in self._entradas:
             try:
                 fila = int(entrada["fila"])
                 silla = int(entrada["silla"])
@@ -164,19 +175,19 @@ class Sala:
             entradas_validas.append(entrada)
 
         self.mapa_ocupacion = mapa
-        self.entradas = entradas_validas
+        self._entradas = entradas_validas
         return errores
 
     def calcular_promedio_ocupacion(self):
-        self.verificar_ocupacion_cargada()
+        self._verificar_ocupacion_cargada()
         return round(float(np.mean(self.mapa_ocupacion)), 2)
 
     def calcular_desviacion_estandar_ocupacion(self):
-        self.verificar_ocupacion_cargada()
+        self._verificar_ocupacion_cargada()
         return round(float(np.std(self.mapa_ocupacion)), 2)
 
     def obtener_ocupacion_maxima(self):
-        self.verificar_ocupacion_cargada()
+        self._verificar_ocupacion_cargada()
         indice_maximo = int(np.argmax(self.mapa_ocupacion))
         fila_maxima, silla_maxima = np.unravel_index(
             indice_maximo, self.mapa_ocupacion.shape
@@ -186,7 +197,7 @@ class Sala:
         )
 
     def obtener_ocupacion_minima(self):
-        self.verificar_ocupacion_cargada()
+        self._verificar_ocupacion_cargada()
         indice_minimo = int(np.argmin(self.mapa_ocupacion))
         fila_minima, silla_minima = np.unravel_index(
             indice_minimo, self.mapa_ocupacion.shape
@@ -209,12 +220,12 @@ class Sala:
         }
 
     def construir_mapa_ingresos(self):
-        self.verificar_ocupacion_cargada()
+        self._verificar_ocupacion_cargada()
         self.mapa_ingresos = self.mapa_ocupacion * self.mapa_precios
         return self.mapa_ingresos
 
     def calcular_ocupacion_total_por_zonas(self):
-        self.verificar_ocupacion_cargada()
+        self._verificar_ocupacion_cargada()
         resultados = []
 
         for zona, limites in self.zonas.items():
@@ -225,7 +236,7 @@ class Sala:
         return resultados
 
     def calcular_ocupacion_promedio_por_zonas(self):
-        self.verificar_ocupacion_cargada()
+        self._verificar_ocupacion_cargada()
         resultados = []
 
         for zona, limites in self.zonas.items():
@@ -236,7 +247,7 @@ class Sala:
         return resultados
 
     def calcular_ingresos_totales_por_zonas(self):
-        self.verificar_ingresos_construidos()
+        self._verificar_ingresos_construidos()
         resultados = []
 
         for zona, limites in self.zonas.items():
@@ -247,7 +258,7 @@ class Sala:
         return resultados
 
     def calcular_ingresos_promedio_por_zonas(self):
-        self.verificar_ingresos_construidos()
+        self._verificar_ingresos_construidos()
         resultados = []
 
         for zona, limites in self.zonas.items():
@@ -277,7 +288,7 @@ class Sala:
     def construir_matriz_dia(self, fecha):
         ventas_dia = []
 
-        for entrada in self.entradas:
+        for entrada in self._entradas:
             if entrada["fecha"] == fecha:
                 ventas_dia.append(entrada)
 
@@ -304,11 +315,11 @@ class Sala:
         return matriz, proyecciones
 
     def construir_matriz_mensual(self):
-        if len(self.entradas) == 0:
+        if len(self._entradas) == 0:
             raise ValueError("No hay ventas para construir la matriz mensual.")
 
         fechas = []
-        for entrada in self.entradas:
+        for entrada in self._entradas:
             fecha_actual = date.fromisoformat(entrada["fecha"])
             if fecha_actual not in fechas:
                 fechas.append(fecha_actual)
@@ -316,7 +327,7 @@ class Sala:
 
         matriz = np.zeros((len(fechas), self.filas, self.sillas), dtype=int)
 
-        for entrada in self.entradas:
+        for entrada in self._entradas:
             fecha_actual = date.fromisoformat(entrada["fecha"])
             indice = fechas.index(fecha_actual)
             fila = entrada["fila"] - 1
@@ -327,12 +338,12 @@ class Sala:
         self.fechas_mensuales = fechas
         return matriz, fechas
 
-    def verificar_matriz_mensual(self):
+    def _verificar_matriz_mensual(self):
         if self.matriz_ocupacion_mensual is None:
             raise ValueError("Primero debe construir la matriz mensual.")
 
     def calcular_totales_diarios_mes(self):
-        self.verificar_matriz_mensual()
+        self._verificar_matriz_mensual()
         return np.sum(self.matriz_ocupacion_mensual, axis=(1, 2))
 
     def calcular_promedios_diarios_mes(self):
@@ -350,6 +361,108 @@ class Sala:
         totales_diarios = self.calcular_totales_diarios_mes()
         indice = int(np.argmin(totales_diarios))
         return self.fechas_mensuales[indice]
+
+    def _verificar_matriz_demanda_sexo(self):
+        if self.matriz_demanda_sexo is None:
+            raise ValueError("Primero debe construir la matriz de demanda por sexo.")
+
+    def construir_matriz_demanda_sexo(self):
+        if len(self._entradas) == 0:
+            raise ValueError("No hay ventas para construir la matriz de demanda por sexo.")
+
+        fechas = []
+        for entrada in self._entradas:
+            fecha_actual = date.fromisoformat(entrada["fecha"])
+            if fecha_actual not in fechas:
+                fechas.append(fecha_actual)
+        fechas.sort()
+
+        matriz_hombres = np.zeros((len(fechas), TOTAL_ZONAS), dtype=int)
+        matriz_mujeres = np.zeros((len(fechas), TOTAL_ZONAS), dtype=int)
+        self.errores_demanda_sexo = []
+
+        for entrada in self._entradas:
+            sexo = entrada["sexo"]
+            if sexo not in SEXOS_VALIDOS:
+                mensaje = "Fila CSV " + str(entrada["numero_fila"]) + ": sexo invalido."
+                self.errores_demanda_sexo.append(mensaje)
+                print(mensaje)
+                continue
+
+            fecha_actual = date.fromisoformat(entrada["fecha"])
+            indice_fecha = fechas.index(fecha_actual)
+            zona = self._zona_de_fila(entrada["fila"] - 1)
+
+            if sexo == "M":
+                matriz_hombres[indice_fecha, zona] += 1
+            else:
+                matriz_mujeres[indice_fecha, zona] += 1
+
+        matriz = np.zeros((len(fechas), TOTAL_ZONAS, TOTAL_SEXOS), dtype=int)
+        matriz[:, :, SEXO_M] = matriz_hombres
+        matriz[:, :, SEXO_F] = matriz_mujeres
+
+        self.matriz_demanda_sexo = matriz
+        self.fechas_demanda_sexo = fechas
+        return matriz, fechas
+
+    def calcular_totales_por_zona_y_sexo(self):
+        self._verificar_matriz_demanda_sexo()
+        return np.sum(self.matriz_demanda_sexo, axis=0)
+
+    def calcular_totales_por_dia_y_sexo(self):
+        self._verificar_matriz_demanda_sexo()
+        return np.sum(self.matriz_demanda_sexo, axis=1)
+
+    def calcular_totales_por_dia_y_zona(self):
+        self._verificar_matriz_demanda_sexo()
+        return np.sum(self.matriz_demanda_sexo, axis=2)
+
+    def obtener_sexo_dominante_del_mes(self):
+        self._verificar_matriz_demanda_sexo()
+        totales_sexo = np.sum(self.matriz_demanda_sexo, axis=(0, 1))
+        if totales_sexo[SEXO_M] > totales_sexo[SEXO_F]:
+            return "M"
+        if totales_sexo[SEXO_F] > totales_sexo[SEXO_M]:
+            return "F"
+        return "Empate"
+
+    def consultar_demanda_por_dia(self, fecha):
+        self._verificar_matriz_demanda_sexo()
+        if isinstance(fecha, str):
+            fecha = date.fromisoformat(fecha)
+        if fecha not in self.fechas_demanda_sexo:
+            raise ValueError("La fecha no tiene registros de demanda.")
+        indice = self.fechas_demanda_sexo.index(fecha)
+        return self.matriz_demanda_sexo[indice, :, :]
+
+    def consultar_demanda_por_zona(self, nombre_zona):
+        self._verificar_matriz_demanda_sexo()
+        if not isinstance(nombre_zona, str):
+            raise TypeError("La zona debe ser un texto.")
+
+        indice_zona = -1
+        for indice in range(TOTAL_ZONAS):
+            if NOMBRE_ZONAS[indice].lower() == nombre_zona.strip().lower():
+                indice_zona = indice
+
+        if indice_zona == -1:
+            raise ValueError("La zona indicada no existe.")
+        return self.matriz_demanda_sexo[:, indice_zona, :]
+
+    def consultar_demanda_por_sexo(self, sexo):
+        self._verificar_matriz_demanda_sexo()
+        if not isinstance(sexo, str):
+            raise TypeError("El sexo debe ser un texto.")
+        sexo = sexo.strip().upper()
+        if sexo not in SEXOS_VALIDOS:
+            raise ValueError("El sexo debe ser M o F.")
+
+        if sexo == "M":
+            indice = SEXO_M
+        else:
+            indice = SEXO_F
+        return self.matriz_demanda_sexo[:, :, indice]
 
     def calcular_totales_dia(self, matriz_dia, proyecciones):
         total_por_proyeccion = np.sum(matriz_dia, axis=(1, 2))
