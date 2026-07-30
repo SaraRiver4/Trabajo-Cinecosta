@@ -1,4 +1,5 @@
 import numpy as np
+from datetime import date
 
 FILAS_SALA_A = 8
 SILLAS_SALA_A = 10
@@ -63,6 +64,8 @@ class Sala:
         self.mapa_ingresos = None
         self.matriz_ocupacion_diaria = None
         self.proyecciones_diarias = []
+        self.matriz_ocupacion_mensual = None
+        self.fechas_mensuales = []
         self._entradas = []
 
     def _establecer_nombre(self, nombre):
@@ -124,6 +127,8 @@ class Sala:
         self.mapa_ingresos = None
         self.matriz_ocupacion_diaria = None
         self.proyecciones_diarias = []
+        self.matriz_ocupacion_mensual = None
+        self.fechas_mensuales = []
         self._entradas = []
 
     def agregar_entrada(self, entrada):
@@ -162,24 +167,45 @@ class Sala:
         self._entradas = entradas_validas
         return errores
 
-    def calcular_estadisticos_ocupacion(self):
+    def calcular_promedio_ocupacion(self):
+        self._verificar_ocupacion_cargada()
+        return round(float(np.mean(self.mapa_ocupacion)), 2)
+
+    def calcular_desviacion_estandar_ocupacion(self):
+        self._verificar_ocupacion_cargada()
+        return round(float(np.std(self.mapa_ocupacion)), 2)
+
+    def obtener_ocupacion_maxima(self):
         self._verificar_ocupacion_cargada()
         indice_maximo = int(np.argmax(self.mapa_ocupacion))
-        indice_minimo = int(np.argmin(self.mapa_ocupacion))
         fila_maxima, silla_maxima = np.unravel_index(
             indice_maximo, self.mapa_ocupacion.shape
         )
+        return int(np.max(self.mapa_ocupacion)), (
+            int(fila_maxima) + 1, int(silla_maxima) + 1
+        )
+
+    def obtener_ocupacion_minima(self):
+        self._verificar_ocupacion_cargada()
+        indice_minimo = int(np.argmin(self.mapa_ocupacion))
         fila_minima, silla_minima = np.unravel_index(
             indice_minimo, self.mapa_ocupacion.shape
         )
+        return int(np.min(self.mapa_ocupacion)), (
+            int(fila_minima) + 1, int(silla_minima) + 1
+        )
+
+    def calcular_estadisticos_ocupacion(self):
+        ocupacion_maxima, posicion_maxima = self.obtener_ocupacion_maxima()
+        ocupacion_minima, posicion_minima = self.obtener_ocupacion_minima()
 
         return {
-            "ocupacion_promedio_por_silla": round(float(np.mean(self.mapa_ocupacion)), 2),
-            "desviacion_estandar": round(float(np.std(self.mapa_ocupacion)), 2),
-            "ocupacion_maxima": int(np.max(self.mapa_ocupacion)),
-            "posicion_maxima": (int(fila_maxima) + 1, int(silla_maxima) + 1),
-            "ocupacion_minima": int(np.min(self.mapa_ocupacion)),
-            "posicion_minima": (int(fila_minima) + 1, int(silla_minima) + 1)
+            "ocupacion_promedio_por_silla": self.calcular_promedio_ocupacion(),
+            "desviacion_estandar": self.calcular_desviacion_estandar_ocupacion(),
+            "ocupacion_maxima": ocupacion_maxima,
+            "posicion_maxima": posicion_maxima,
+            "ocupacion_minima": ocupacion_minima,
+            "posicion_minima": posicion_minima
         }
 
     def construir_mapa_ingresos(self):
@@ -187,21 +213,63 @@ class Sala:
         self.mapa_ingresos = self.mapa_ocupacion * self.mapa_precios
         return self.mapa_ingresos
 
-    def analizar_por_zona(self):
+    def calcular_ocupacion_total_por_zonas(self):
         self._verificar_ocupacion_cargada()
-        self._verificar_ingresos_construidos()
-        resultado = {}
+        resultados = []
 
         for zona, limites in self.zonas.items():
             inicio = limites[0]
             fin = limites[1]
             ocupacion_zona = self.mapa_ocupacion[inicio:fin + 1, :]
+            resultados.append(int(np.sum(ocupacion_zona)))
+        return resultados
+
+    def calcular_ocupacion_promedio_por_zonas(self):
+        self._verificar_ocupacion_cargada()
+        resultados = []
+
+        for zona, limites in self.zonas.items():
+            inicio = limites[0]
+            fin = limites[1]
+            ocupacion_zona = self.mapa_ocupacion[inicio:fin + 1, :]
+            resultados.append(round(float(np.mean(ocupacion_zona)), 2))
+        return resultados
+
+    def calcular_ingresos_totales_por_zonas(self):
+        self._verificar_ingresos_construidos()
+        resultados = []
+
+        for zona, limites in self.zonas.items():
+            inicio = limites[0]
+            fin = limites[1]
             ingresos_zona = self.mapa_ingresos[inicio:fin + 1, :]
+            resultados.append(round(float(np.sum(ingresos_zona)), 2))
+        return resultados
+
+    def calcular_ingresos_promedio_por_zonas(self):
+        self._verificar_ingresos_construidos()
+        resultados = []
+
+        for zona, limites in self.zonas.items():
+            inicio = limites[0]
+            fin = limites[1]
+            ingresos_zona = self.mapa_ingresos[inicio:fin + 1, :]
+            resultados.append(round(float(np.mean(ingresos_zona)), 2))
+        return resultados
+
+    def analizar_por_zona(self):
+        ocupaciones_totales = self.calcular_ocupacion_total_por_zonas()
+        ocupaciones_promedio = self.calcular_ocupacion_promedio_por_zonas()
+        ingresos_totales = self.calcular_ingresos_totales_por_zonas()
+        ingresos_promedio = self.calcular_ingresos_promedio_por_zonas()
+        resultado = {}
+
+        for zona in range(TOTAL_ZONAS):
             resultado[NOMBRE_ZONAS[zona]] = {
-                "ocupacion_total": int(np.sum(ocupacion_zona)),
-                "ocupacion_promedio_por_silla": round(float(np.mean(ocupacion_zona)), 2),
-                "ingresos_totales": round(float(np.sum(ingresos_zona)), 2),
-                "ingresos_promedio_por_silla": round(float(np.mean(ingresos_zona)), 2)
+                "ocupacion_total": ocupaciones_totales[zona],
+                "ocupacion_promedio_por_silla": ocupaciones_promedio[zona],
+                "ingresos_totales": ingresos_totales[zona],
+                "ingresos_promedio_por_silla": ingresos_promedio[zona]
             }
 
         return resultado
@@ -234,6 +302,54 @@ class Sala:
         self.matriz_ocupacion_diaria = matriz
         self.proyecciones_diarias = proyecciones
         return matriz, proyecciones
+
+    def construir_matriz_mensual(self):
+        if len(self._entradas) == 0:
+            raise ValueError("No hay ventas para construir la matriz mensual.")
+
+        fechas = []
+        for entrada in self._entradas:
+            fecha_actual = date.fromisoformat(entrada["fecha"])
+            if fecha_actual not in fechas:
+                fechas.append(fecha_actual)
+        fechas.sort()
+
+        matriz = np.zeros((len(fechas), self.filas, self.sillas), dtype=int)
+
+        for entrada in self._entradas:
+            fecha_actual = date.fromisoformat(entrada["fecha"])
+            indice = fechas.index(fecha_actual)
+            fila = entrada["fila"] - 1
+            silla = entrada["silla"] - 1
+            matriz[indice, fila, silla] += 1
+
+        self.matriz_ocupacion_mensual = matriz
+        self.fechas_mensuales = fechas
+        return matriz, fechas
+
+    def _verificar_matriz_mensual(self):
+        if self.matriz_ocupacion_mensual is None:
+            raise ValueError("Primero debe construir la matriz mensual.")
+
+    def calcular_totales_diarios_mes(self):
+        self._verificar_matriz_mensual()
+        return np.sum(self.matriz_ocupacion_mensual, axis=(1, 2))
+
+    def calcular_promedios_diarios_mes(self):
+        totales_diarios = self.calcular_totales_diarios_mes()
+        total_sillas = self.filas * self.sillas
+        promedios = np.round(totales_diarios / total_sillas, 2)
+        return promedios.tolist()
+
+    def obtener_dia_mayor_demanda(self):
+        totales_diarios = self.calcular_totales_diarios_mes()
+        indice = int(np.argmax(totales_diarios))
+        return self.fechas_mensuales[indice]
+
+    def obtener_dia_menor_demanda(self):
+        totales_diarios = self.calcular_totales_diarios_mes()
+        indice = int(np.argmin(totales_diarios))
+        return self.fechas_mensuales[indice]
 
     def calcular_totales_dia(self, matriz_dia, proyecciones):
         total_por_proyeccion = np.sum(matriz_dia, axis=(1, 2))
