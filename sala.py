@@ -54,28 +54,28 @@ ZONAS_POR_TAMANO = {
 class Sala:
 
     def __init__(self, nombre, tamano, precio_base):
-        self._establecer_nombre(nombre)
-        self._establecer_tamano(tamano)
-        self._establecer_precio_base(precio_base)
+        self.establecer_nombre(nombre)
+        self.establecer_tamaño(tamano)
+        self.establecer_precio_base(precio_base)
         self.filas, self.sillas = DIMENSIONES_POR_TAMANO[self.tamano]
         self.zonas = ZONAS_POR_TAMANO[self.tamano]
-        self.mapa_precios = self._construir_mapa_precios()
+        self.mapa_precios = self.construir_mapa_precios()
         self.mapa_ocupacion = None
         self.mapa_ingresos = None
         self.matriz_ocupacion_diaria = None
         self.proyecciones_diarias = []
         self.matriz_ocupacion_mensual = None
         self.fechas_mensuales = []
-        self._entradas = []
+        self.entradas = []
 
-    def _establecer_nombre(self, nombre):
+    def establecer_nombre(self, nombre):
         if not isinstance(nombre, str):
             raise TypeError("El nombre de la sala debe ser un texto.")
         if nombre.strip() == "":
             raise ValueError("El nombre de la sala no puede estar vacio.")
         self.nombre = nombre.strip()
 
-    def _establecer_tamano(self, tamano):
+    def establecer_tamaño(self, tamano):
         if not isinstance(tamano, str):
             raise TypeError("El tamano de la sala debe ser un texto.")
         tamano = tamano.strip().upper()
@@ -83,7 +83,7 @@ class Sala:
             raise ValueError("El tamano de la sala debe ser A, B o C.")
         self.tamano = tamano
 
-    def _establecer_precio_base(self, precio_base):
+    def establecer_precio_base(self, precio_base):
         if isinstance(precio_base, bool):
             raise TypeError("El precio base debe ser numerico.")
         if not isinstance(precio_base, (int, float)):
@@ -92,7 +92,7 @@ class Sala:
             raise ValueError("El precio base debe ser mayor que cero.")
         self.precio_base = float(precio_base)
 
-    def _construir_mapa_precios(self):
+    def construir_mapa_precios(self):
         mapa = np.zeros((self.filas, self.sillas), dtype=float)
         for zona, limites in self.zonas.items():
             inicio = limites[0]
@@ -108,17 +108,17 @@ class Sala:
             mapa[inicio:fin + 1, :] = self.precio_base * factor
         return mapa
 
-    def _zona_de_fila(self, indice_fila):
+    def zona_de_fila(self, indice_fila):
         for zona, limites in self.zonas.items():
             if limites[0] <= indice_fila <= limites[1]:
                 return zona
         raise ValueError("La fila esta fuera del rango de la sala.")
 
-    def _verificar_ocupacion_cargada(self):
+    def verificar_ocupacion_cargada(self):
         if self.mapa_ocupacion is None:
             raise ValueError("Primero debe cargar el mapa de ocupacion.")
 
-    def _verificar_ingresos_construidos(self):
+    def verificar_ingresos_construidos(self):
         if self.mapa_ingresos is None:
             raise ValueError("Primero debe construir el mapa de ingresos.")
 
@@ -129,17 +129,17 @@ class Sala:
         self.proyecciones_diarias = []
         self.matriz_ocupacion_mensual = None
         self.fechas_mensuales = []
-        self._entradas = []
+        self.entradas = []
 
     def agregar_entrada(self, entrada):
-        self._entradas.append(entrada)
+        self.entradas.append(entrada)
 
     def cargar_mapa_ocupacion(self):
         mapa = np.zeros((self.filas, self.sillas), dtype=int)
         entradas_validas = []
         errores = []
 
-        for entrada in self._entradas:
+        for entrada in self.entradas:
             try:
                 fila = int(entrada["fila"])
                 silla = int(entrada["silla"])
@@ -164,19 +164,19 @@ class Sala:
             entradas_validas.append(entrada)
 
         self.mapa_ocupacion = mapa
-        self._entradas = entradas_validas
+        self.entradas = entradas_validas
         return errores
 
     def calcular_promedio_ocupacion(self):
-        self._verificar_ocupacion_cargada()
+        self.verificar_ocupacion_cargada()
         return round(float(np.mean(self.mapa_ocupacion)), 2)
 
     def calcular_desviacion_estandar_ocupacion(self):
-        self._verificar_ocupacion_cargada()
+        self.verificar_ocupacion_cargada()
         return round(float(np.std(self.mapa_ocupacion)), 2)
 
     def obtener_ocupacion_maxima(self):
-        self._verificar_ocupacion_cargada()
+        self.verificar_ocupacion_cargada()
         indice_maximo = int(np.argmax(self.mapa_ocupacion))
         fila_maxima, silla_maxima = np.unravel_index(
             indice_maximo, self.mapa_ocupacion.shape
@@ -186,7 +186,7 @@ class Sala:
         )
 
     def obtener_ocupacion_minima(self):
-        self._verificar_ocupacion_cargada()
+        self.verificar_ocupacion_cargada()
         indice_minimo = int(np.argmin(self.mapa_ocupacion))
         fila_minima, silla_minima = np.unravel_index(
             indice_minimo, self.mapa_ocupacion.shape
@@ -209,12 +209,12 @@ class Sala:
         }
 
     def construir_mapa_ingresos(self):
-        self._verificar_ocupacion_cargada()
+        self.verificar_ocupacion_cargada()
         self.mapa_ingresos = self.mapa_ocupacion * self.mapa_precios
         return self.mapa_ingresos
 
     def calcular_ocupacion_total_por_zonas(self):
-        self._verificar_ocupacion_cargada()
+        self.verificar_ocupacion_cargada()
         resultados = []
 
         for zona, limites in self.zonas.items():
@@ -225,7 +225,7 @@ class Sala:
         return resultados
 
     def calcular_ocupacion_promedio_por_zonas(self):
-        self._verificar_ocupacion_cargada()
+        self.verificar_ocupacion_cargada()
         resultados = []
 
         for zona, limites in self.zonas.items():
@@ -236,7 +236,7 @@ class Sala:
         return resultados
 
     def calcular_ingresos_totales_por_zonas(self):
-        self._verificar_ingresos_construidos()
+        self.verificar_ingresos_construidos()
         resultados = []
 
         for zona, limites in self.zonas.items():
@@ -247,7 +247,7 @@ class Sala:
         return resultados
 
     def calcular_ingresos_promedio_por_zonas(self):
-        self._verificar_ingresos_construidos()
+        self.verificar_ingresos_construidos()
         resultados = []
 
         for zona, limites in self.zonas.items():
@@ -277,7 +277,7 @@ class Sala:
     def construir_matriz_dia(self, fecha):
         ventas_dia = []
 
-        for entrada in self._entradas:
+        for entrada in self.entradas:
             if entrada["fecha"] == fecha:
                 ventas_dia.append(entrada)
 
@@ -304,11 +304,11 @@ class Sala:
         return matriz, proyecciones
 
     def construir_matriz_mensual(self):
-        if len(self._entradas) == 0:
+        if len(self.entradas) == 0:
             raise ValueError("No hay ventas para construir la matriz mensual.")
 
         fechas = []
-        for entrada in self._entradas:
+        for entrada in self.entradas:
             fecha_actual = date.fromisoformat(entrada["fecha"])
             if fecha_actual not in fechas:
                 fechas.append(fecha_actual)
@@ -316,7 +316,7 @@ class Sala:
 
         matriz = np.zeros((len(fechas), self.filas, self.sillas), dtype=int)
 
-        for entrada in self._entradas:
+        for entrada in self.entradas:
             fecha_actual = date.fromisoformat(entrada["fecha"])
             indice = fechas.index(fecha_actual)
             fila = entrada["fila"] - 1
@@ -327,12 +327,12 @@ class Sala:
         self.fechas_mensuales = fechas
         return matriz, fechas
 
-    def _verificar_matriz_mensual(self):
+    def verificar_matriz_mensual(self):
         if self.matriz_ocupacion_mensual is None:
             raise ValueError("Primero debe construir la matriz mensual.")
 
     def calcular_totales_diarios_mes(self):
-        self._verificar_matriz_mensual()
+        self.verificar_matriz_mensual()
         return np.sum(self.matriz_ocupacion_mensual, axis=(1, 2))
 
     def calcular_promedios_diarios_mes(self):
