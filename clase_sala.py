@@ -1,487 +1,538 @@
+import csv
 import numpy as np
-from datetime import date
 
-FILAS_SALA_A = 8
-SILLAS_SALA_A = 10
-FILAS_SALA_B = 10
-SILLAS_SALA_B = 12
-FILAS_SALA_C = 12
-SILLAS_SALA_C = 14
+DIMENSIONES_TAMAÑO: dict[str, tuple[int, int]] ={
+    "A": (8, 10),
+    "B": (10, 12),
+    "C": (12, 14)}
 
-TAMANOS_VALIDOS = ["A", "B", "C"]
-
-DIMENSIONES_POR_TAMANO = {
-    "A": (FILAS_SALA_A, SILLAS_SALA_A),
-    "B": (FILAS_SALA_B, SILLAS_SALA_B),
-    "C": (FILAS_SALA_C, SILLAS_SALA_C)
-}
-
-FACTOR_ECONOMICA = 1.0
-FACTOR_PREMIUM = 2.0
-FACTOR_INTERMEDIA = 1.5
-FACTOR_ULTIMA_FILA = 1.2
-
-ZONA_ECONOMICA = 0
-ZONA_PREMIUM = 1
-ZONA_INTERMEDIA = 2
-ZONA_ULTIMA_FILA = 3
-TOTAL_ZONAS = 4
-
-NOMBRE_ZONAS = ["Economica", "Premium", "Intermedia", "Ultima fila"]
-
-SEXO_M = 0
-SEXO_F = 1
-TOTAL_SEXOS = 2
-SEXOS_VALIDOS = ["M", "F"]
-
-ZONAS_POR_TAMANO = {
-    "A": {
-        ZONA_ECONOMICA: (0, 2),
-        ZONA_PREMIUM: (3, 4),
-        ZONA_INTERMEDIA: (5, 6),
-        ZONA_ULTIMA_FILA: (7, 7)
+FILAS_ZONAS: dict[str, dict[str, tuple[int, int]]] = {
+    "A": { 
+        "económica": (1, 3),
+        "premium": (4, 5),
+        "intermedia": (6, 7),
+        "última fila": (8, 8)
     },
     "B": {
-        ZONA_ECONOMICA: (0, 3),
-        ZONA_PREMIUM: (4, 5),
-        ZONA_INTERMEDIA: (6, 8),
-        ZONA_ULTIMA_FILA: (9, 9)
+        "económica": (1, 4),
+        "premium": (5, 6),
+        "intermedia": (7, 9),
+        "última fila": (10, 10)
     },
     "C": {
-        ZONA_ECONOMICA: (0, 4),
-        ZONA_PREMIUM: (5, 6),
-        ZONA_INTERMEDIA: (7, 10),
-        ZONA_ULTIMA_FILA: (11, 11)
+        "económica": (1, 5),
+        "premium": (6, 7),
+        "intermedia": (8, 11),
+        "última fila": (12, 12)
     }
 }
 
+FACTORES_PRECIOS: dict[str, float] = {
+    "económica": 1,
+    "premium": 2.5,
+    "intermedia": 1.5,
+    "última fila": 1.2
+}
+
+SEXOS: tuple[str, ...] = ("hombre", "mujer")
 
 class Sala:
-
-    def __init__(self, nombre, tamano, precio_base):
-        self._establecer_nombre(nombre)
-        self._establecer_tamano(tamano)
-        self._establecer_precio_base(precio_base)
-        self.filas, self.sillas = DIMENSIONES_POR_TAMANO[self.tamano]
-        self.zonas = ZONAS_POR_TAMANO[self.tamano]
-        self.mapa_precios = self._construir_mapa_precios()
-        self.mapa_ocupacion = None
-        self.mapa_ingresos = None
-        self.matriz_ocupacion_diaria = None
-        self.proyecciones_diarias = []
-        self.matriz_ocupacion_mensual = None
-        self.fechas_mensuales = []
-        self.matriz_demanda_sexo = None
-        self.fechas_demanda_sexo = []
-        self.errores_demanda_sexo = []
-        self._entradas = []
-
-    def _establecer_nombre(self, nombre):
-        if not isinstance(nombre, str):
-            raise TypeError("El nombre de la sala debe ser un texto.")
-        if nombre.strip() == "":
-            raise ValueError("El nombre de la sala no puede estar vacio.")
-        self.nombre = nombre.strip()
-
-    def _establecer_tamano(self, tamano):
-        if not isinstance(tamano, str):
-            raise TypeError("El tamano de la sala debe ser un texto.")
-        tamano = tamano.strip().upper()
-        if tamano not in TAMANOS_VALIDOS:
-            raise ValueError("El tamano de la sala debe ser A, B o C.")
-        self.tamano = tamano
-
-    def _establecer_precio_base(self, precio_base):
-        if isinstance(precio_base, bool):
-            raise TypeError("El precio base debe ser numerico.")
-        if not isinstance(precio_base, (int, float)):
-            raise TypeError("El precio base debe ser numerico.")
-        if not np.isfinite(precio_base) or precio_base <= 0:
-            raise ValueError("El precio base debe ser mayor que cero.")
-        self.precio_base = float(precio_base)
-
-    def _construir_mapa_precios(self):
-        mapa = np.zeros((self.filas, self.sillas), dtype=float)
-        for zona, limites in self.zonas.items():
-            inicio = limites[0]
-            fin = limites[1]
-            if zona == ZONA_ECONOMICA:
-                factor = FACTOR_ECONOMICA
-            elif zona == ZONA_PREMIUM:
-                factor = FACTOR_PREMIUM
-            elif zona == ZONA_INTERMEDIA:
-                factor = FACTOR_INTERMEDIA
-            else:
-                factor = FACTOR_ULTIMA_FILA
-            mapa[inicio:fin + 1, :] = self.precio_base * factor
-        return mapa
-
-    def _zona_de_fila(self, indice_fila):
-        for zona, limites in self.zonas.items():
-            if limites[0] <= indice_fila <= limites[1]:
-                return zona
-        raise ValueError("La fila esta fuera del rango de la sala.")
-
-    def _verificar_ocupacion_cargada(self):
-        if self.mapa_ocupacion is None:
-            raise ValueError("Primero debe cargar el mapa de ocupacion.")
-
-    def _verificar_ingresos_construidos(self):
-        if self.mapa_ingresos is None:
-            raise ValueError("Primero debe construir el mapa de ingresos.")
-
-    def reiniciar_datos_mensuales(self):
-        self.mapa_ocupacion = None
-        self.mapa_ingresos = None
-        self.matriz_ocupacion_diaria = None
-        self.proyecciones_diarias = []
-        self.matriz_ocupacion_mensual = None
-        self.fechas_mensuales = []
-        self.matriz_demanda_sexo = None
-        self.fechas_demanda_sexo = []
-        self.errores_demanda_sexo = []
-        self._entradas = []
-
-    def agregar_entrada(self, entrada):
-        self._entradas.append(entrada)
-
-    def cargar_mapa_ocupacion(self):
-        mapa = np.zeros((self.filas, self.sillas), dtype=int)
-        entradas_validas = []
-        errores = []
-
-        for entrada in self._entradas:
-            try:
-                fila = int(entrada["fila"])
-                silla = int(entrada["silla"])
-            except (KeyError, TypeError, ValueError):
-                errores.append("Fila CSV " + str(entrada["numero_fila"]) + ": fila o silla invalidas.")
-                continue
-
-            if fila < 1 or fila > self.filas:
-                errores.append(
-                    "Fila CSV " + str(entrada["numero_fila"]) + ": fila "
-                    + str(fila) + " fuera del rango de la sala."
-                )
-                continue
-            if silla < 1 or silla > self.sillas:
-                errores.append(
-                    "Fila CSV " + str(entrada["numero_fila"]) + ": silla "
-                    + str(silla) + " fuera del rango de la sala."
-                )
-                continue
-
-            mapa[fila - 1, silla - 1] += 1
-            entradas_validas.append(entrada)
-
-        self.mapa_ocupacion = mapa
-        self._entradas = entradas_validas
-        return errores
-
-    def calcular_promedio_ocupacion(self):
-        self._verificar_ocupacion_cargada()
-        return round(float(np.mean(self.mapa_ocupacion)), 2)
-
-    def calcular_desviacion_estandar_ocupacion(self):
-        self._verificar_ocupacion_cargada()
-        return round(float(np.std(self.mapa_ocupacion)), 2)
-
-    def obtener_ocupacion_maxima(self):
-        self._verificar_ocupacion_cargada()
-        indice_maximo = int(np.argmax(self.mapa_ocupacion))
-        fila_maxima, silla_maxima = np.unravel_index(
-            indice_maximo, self.mapa_ocupacion.shape
-        )
-        return int(np.max(self.mapa_ocupacion)), (
-            int(fila_maxima) + 1, int(silla_maxima) + 1
-        )
-
-    def obtener_ocupacion_minima(self):
-        self._verificar_ocupacion_cargada()
-        indice_minimo = int(np.argmin(self.mapa_ocupacion))
-        fila_minima, silla_minima = np.unravel_index(
-            indice_minimo, self.mapa_ocupacion.shape
-        )
-        return int(np.min(self.mapa_ocupacion)), (
-            int(fila_minima) + 1, int(silla_minima) + 1
-        )
-
-    def calcular_estadisticos_ocupacion(self):
-        ocupacion_maxima, posicion_maxima = self.obtener_ocupacion_maxima()
-        ocupacion_minima, posicion_minima = self.obtener_ocupacion_minima()
-
-        return {
-            "ocupacion_promedio_por_silla": self.calcular_promedio_ocupacion(),
-            "desviacion_estandar": self.calcular_desviacion_estandar_ocupacion(),
-            "ocupacion_maxima": ocupacion_maxima,
-            "posicion_maxima": posicion_maxima,
-            "ocupacion_minima": ocupacion_minima,
-            "posicion_minima": posicion_minima
-        }
-
-    def construir_mapa_ingresos(self):
-        self._verificar_ocupacion_cargada()
-        self.mapa_ingresos = self.mapa_ocupacion * self.mapa_precios
-        return self.mapa_ingresos
-
-    def calcular_ocupacion_total_por_zonas(self):
-        self._verificar_ocupacion_cargada()
-        resultados = []
-
-        for zona, limites in self.zonas.items():
-            inicio = limites[0]
-            fin = limites[1]
-            ocupacion_zona = self.mapa_ocupacion[inicio:fin + 1, :]
-            resultados.append(int(np.sum(ocupacion_zona)))
-        return resultados
-
-    def calcular_ocupacion_promedio_por_zonas(self):
-        self._verificar_ocupacion_cargada()
-        resultados = []
-
-        for zona, limites in self.zonas.items():
-            inicio = limites[0]
-            fin = limites[1]
-            ocupacion_zona = self.mapa_ocupacion[inicio:fin + 1, :]
-            resultados.append(round(float(np.mean(ocupacion_zona)), 2))
-        return resultados
-
-    def calcular_ingresos_totales_por_zonas(self):
-        self._verificar_ingresos_construidos()
-        resultados = []
-
-        for zona, limites in self.zonas.items():
-            inicio = limites[0]
-            fin = limites[1]
-            ingresos_zona = self.mapa_ingresos[inicio:fin + 1, :]
-            resultados.append(round(float(np.sum(ingresos_zona)), 2))
-        return resultados
-
-    def calcular_ingresos_promedio_por_zonas(self):
-        self._verificar_ingresos_construidos()
-        resultados = []
-
-        for zona, limites in self.zonas.items():
-            inicio = limites[0]
-            fin = limites[1]
-            ingresos_zona = self.mapa_ingresos[inicio:fin + 1, :]
-            resultados.append(round(float(np.mean(ingresos_zona)), 2))
-        return resultados
-
-    def analizar_por_zona(self):
-        ocupaciones_totales = self.calcular_ocupacion_total_por_zonas()
-        ocupaciones_promedio = self.calcular_ocupacion_promedio_por_zonas()
-        ingresos_totales = self.calcular_ingresos_totales_por_zonas()
-        ingresos_promedio = self.calcular_ingresos_promedio_por_zonas()
-        resultado = {}
-
-        for zona in range(TOTAL_ZONAS):
-            resultado[NOMBRE_ZONAS[zona]] = {
-                "ocupacion_total": ocupaciones_totales[zona],
-                "ocupacion_promedio_por_silla": ocupaciones_promedio[zona],
-                "ingresos_totales": ingresos_totales[zona],
-                "ingresos_promedio_por_silla": ingresos_promedio[zona]
-            }
-
-        return resultado
-
-    def construir_matriz_dia(self, fecha):
-        ventas_dia = []
-
-        for entrada in self._entradas:
-            if entrada["fecha"] == fecha:
-                ventas_dia.append(entrada)
-
-        if len(ventas_dia) == 0:
-            raise ValueError("No hay ventas para la fecha indicada.")
-
-        proyecciones = []
-        for entrada in ventas_dia:
-            numero = entrada["num_proyeccion"]
-            if numero not in proyecciones:
-                proyecciones.append(numero)
-        proyecciones.sort()
-
-        matriz = np.zeros((len(proyecciones), self.filas, self.sillas), dtype=int)
-
-        for entrada in ventas_dia:
-            indice = proyecciones.index(entrada["num_proyeccion"])
-            fila = entrada["fila"] - 1
-            silla = entrada["silla"] - 1
-            matriz[indice, fila, silla] = 1
-
-        self.matriz_ocupacion_diaria = matriz
-        self.proyecciones_diarias = proyecciones
-        return matriz, proyecciones
-
-    def construir_matriz_mensual(self):
-        if len(self._entradas) == 0:
-            raise ValueError("No hay ventas para construir la matriz mensual.")
-
-        fechas = []
-        for entrada in self._entradas:
-            fecha_actual = date.fromisoformat(entrada["fecha"])
-            if fecha_actual not in fechas:
-                fechas.append(fecha_actual)
-        fechas.sort()
-
-        matriz = np.zeros((len(fechas), self.filas, self.sillas), dtype=int)
-
-        for entrada in self._entradas:
-            fecha_actual = date.fromisoformat(entrada["fecha"])
-            indice = fechas.index(fecha_actual)
-            fila = entrada["fila"] - 1
-            silla = entrada["silla"] - 1
-            matriz[indice, fila, silla] += 1
-
-        self.matriz_ocupacion_mensual = matriz
-        self.fechas_mensuales = fechas
-        return matriz, fechas
-
-    def _verificar_matriz_mensual(self):
-        if self.matriz_ocupacion_mensual is None:
-            raise ValueError("Primero debe construir la matriz mensual.")
-
-    def calcular_totales_diarios_mes(self):
-        self._verificar_matriz_mensual()
-        return np.sum(self.matriz_ocupacion_mensual, axis=(1, 2))
-
-    def calcular_promedios_diarios_mes(self):
-        totales_diarios = self.calcular_totales_diarios_mes()
-        total_sillas = self.filas * self.sillas
-        promedios = np.round(totales_diarios / total_sillas, 2)
-        return promedios.tolist()
-
-    def obtener_dia_mayor_demanda(self):
-        totales_diarios = self.calcular_totales_diarios_mes()
-        indice = int(np.argmax(totales_diarios))
-        return self.fechas_mensuales[indice]
-
-    def obtener_dia_menor_demanda(self):
-        totales_diarios = self.calcular_totales_diarios_mes()
-        indice = int(np.argmin(totales_diarios))
-        return self.fechas_mensuales[indice]
-
-    def _verificar_matriz_demanda_sexo(self):
-        if self.matriz_demanda_sexo is None:
-            raise ValueError("Primero debe construir la matriz de demanda por sexo.")
-
-    def construir_matriz_demanda_sexo(self):
-        if len(self._entradas) == 0:
-            raise ValueError("No hay ventas para construir la matriz de demanda por sexo.")
-
-        fechas = []
-        for entrada in self._entradas:
-            fecha_actual = date.fromisoformat(entrada["fecha"])
-            if fecha_actual not in fechas:
-                fechas.append(fecha_actual)
-        fechas.sort()
-
-        matriz_hombres = np.zeros((len(fechas), TOTAL_ZONAS), dtype=int)
-        matriz_mujeres = np.zeros((len(fechas), TOTAL_ZONAS), dtype=int)
-        self.errores_demanda_sexo = []
-
-        for entrada in self._entradas:
-            sexo = entrada["sexo"]
-            if sexo not in SEXOS_VALIDOS:
-                mensaje = "Fila CSV " + str(entrada["numero_fila"]) + ": sexo invalido."
-                self.errores_demanda_sexo.append(mensaje)
-                print(mensaje)
-                continue
-
-            fecha_actual = date.fromisoformat(entrada["fecha"])
-            indice_fecha = fechas.index(fecha_actual)
-            zona = self._zona_de_fila(entrada["fila"] - 1)
-
-            if sexo == "M":
-                matriz_hombres[indice_fecha, zona] += 1
-            else:
-                matriz_mujeres[indice_fecha, zona] += 1
-
-        matriz = np.zeros((len(fechas), TOTAL_ZONAS, TOTAL_SEXOS), dtype=int)
-        matriz[:, :, SEXO_M] = matriz_hombres
-        matriz[:, :, SEXO_F] = matriz_mujeres
-
-        self.matriz_demanda_sexo = matriz
-        self.fechas_demanda_sexo = fechas
-        return matriz, fechas
-
-    def calcular_totales_por_zona_y_sexo(self):
-        self._verificar_matriz_demanda_sexo()
-        return np.sum(self.matriz_demanda_sexo, axis=0)
-
-    def calcular_totales_por_dia_y_sexo(self):
-        self._verificar_matriz_demanda_sexo()
-        return np.sum(self.matriz_demanda_sexo, axis=1)
-
-    def calcular_totales_por_dia_y_zona(self):
-        self._verificar_matriz_demanda_sexo()
-        return np.sum(self.matriz_demanda_sexo, axis=2)
-
-    def obtener_sexo_dominante_del_mes(self):
-        self._verificar_matriz_demanda_sexo()
-        totales_sexo = np.sum(self.matriz_demanda_sexo, axis=(0, 1))
-        if totales_sexo[SEXO_M] > totales_sexo[SEXO_F]:
-            return "M"
-        if totales_sexo[SEXO_F] > totales_sexo[SEXO_M]:
-            return "F"
-        return "Empate"
-
-    def consultar_demanda_por_dia(self, fecha):
-        self._verificar_matriz_demanda_sexo()
-        if isinstance(fecha, str):
-            fecha = date.fromisoformat(fecha)
-        if fecha not in self.fechas_demanda_sexo:
-            raise ValueError("La fecha no tiene registros de demanda.")
-        indice = self.fechas_demanda_sexo.index(fecha)
-        return self.matriz_demanda_sexo[indice, :, :]
-
-    def consultar_demanda_por_zona(self, nombre_zona):
-        self._verificar_matriz_demanda_sexo()
-        if not isinstance(nombre_zona, str):
-            raise TypeError("La zona debe ser un texto.")
-
-        indice_zona = -1
-        for indice in range(TOTAL_ZONAS):
-            if NOMBRE_ZONAS[indice].lower() == nombre_zona.strip().lower():
-                indice_zona = indice
-
-        if indice_zona == -1:
-            raise ValueError("La zona indicada no existe.")
-        return self.matriz_demanda_sexo[:, indice_zona, :]
-
-    def consultar_demanda_por_sexo(self, sexo):
-        self._verificar_matriz_demanda_sexo()
-        if not isinstance(sexo, str):
-            raise TypeError("El sexo debe ser un texto.")
-        sexo = sexo.strip().upper()
-        if sexo not in SEXOS_VALIDOS:
-            raise ValueError("El sexo debe ser M o F.")
-
-        if sexo == "M":
-            indice = SEXO_M
-        else:
-            indice = SEXO_F
-        return self.matriz_demanda_sexo[:, :, indice]
-
-    def calcular_totales_dia(self, matriz_dia, proyecciones):
-        total_por_proyeccion = np.sum(matriz_dia, axis=(1, 2))
-        total_por_silla = np.sum(matriz_dia, axis=0)
-        total_por_zona = {}
-
-        for zona, limites in self.zonas.items():
-            inicio = limites[0]
-            fin = limites[1]
-            total_por_zona[NOMBRE_ZONAS[zona]] = int(
-                np.sum(total_por_silla[inicio:fin + 1, :])
+    def __init__(self,nombre: str,tamaño: str,precio_base: float,teatro: str = ""):
+
+        tamaño = tamaño.upper()
+        if tamaño not in DIMENSIONES_TAMAÑO:
+            raise ValueError("El tamaño debe ser A, B o C")
+        if precio_base <= 0:
+            raise ValueError(
+                "El precio base debe ser mayor que cero"
             )
 
-        resultado_proyecciones = {}
-        for indice in range(len(proyecciones)):
-            resultado_proyecciones[proyecciones[indice]] = int(total_por_proyeccion[indice])
+        self.nombre: str = nombre
+        self.tamaño: str = tamaño
+        self.precio_base: float = precio_base
+        self.teatro: str = teatro
+        self.filas: int = DIMENSIONES_TAMAÑO[tamaño][0]
+        self.sillas_por_fila: int = DIMENSIONES_TAMAÑO[tamaño][1]
+        self.mapa_ocupación_mensual: np.ndarray | None = None
+        self.mapa_ingresos_mensual: np.ndarray | None = None
+        self.matriz_ocupación_día: np.ndarray | None = None
+        self.matriz_demanda_sexo: np.ndarray | None = None
+
+    def leer_csv(self,ruta_csv: str) -> list[dict[str, str]]:
+        registros: list[dict[str, str]] = []
+        try:
+            archivo = open(ruta_csv,
+                mode="r",
+                encoding="utf-8",
+                newline=""
+            )
+        except FileNotFoundError:
+            raise FileNotFoundError(
+                f"No existe el archivo CSV: {ruta_csv}"
+            )
+
+        with archivo:
+            lector = csv.DictReader(archivo)
+
+            for fila in lector:
+                if (
+                    fila["teatro"].strip() == self.teatro
+                    and fila["sala"].strip() == self.nombre
+                ):
+                    registros.append(fila)
+
+        if len(registros) == 0:
+            raise ValueError(
+                f"No existen registros para la sala {self.nombre}")
+        return registros
+
+    def convertir_día(self, fecha: str) -> int:
+        fecha = fecha.strip()
+
+        if "-" in fecha:
+            partes = fecha.split("-")
+            return int(partes[2])
+
+        if "/" in fecha:
+            partes = fecha.split("/")
+            return int(partes[0])
+
+        raise ValueError(
+            f"Formato de fecha no válido: {fecha}"
+        )
+
+    def validar_asiento(self,fila: int,silla: int) -> bool:
+        return (
+            1 <= fila <= self.filas
+            and 1 <= silla <= self.sillas_por_fila
+        )
+
+    def zona_de_fila(self, fila: int) -> str:
+        zonas = FILAS_ZONAS[self.tamaño]
+        for zona, limites in zonas.items():
+            fila_inicial, fila_final = limites
+            if fila_inicial <= fila <= fila_final:
+                return zona
+            
+        raise ValueError(
+            f"La fila {fila} no pertenece a ninguna zona")
+
+    def precio_de_silla(self, fila: int) -> float:
+        zona = self.zona_de_fila(fila)
+        factor = FACTORES_PRECIOS[zona]
+        return self.precio_base * factor
+
+    def construir_mapa_ocupación_mensual(self,ruta_csv: str) -> np.ndarray:
+        registros = self.leer_csv(ruta_csv)
+        días = [
+            self.convertir_día(registro["fecha"])
+            for registro in registros
+        ]
+
+        cantidad_días = max(días)
+        mapa = np.zeros(
+            (cantidad_días,self.filas,self.sillas_por_fila),dtype=int
+        )
+
+        for registro in registros:
+            día = self.convertir_día(registro["fecha"])
+            fila = int(registro["fila"])
+            silla = int(registro["silla"])
+
+            if not self.validar_asiento(fila, silla):
+                continue
+            mapa[día - 1, fila - 1, silla - 1] += 1
+
+        self.mapa_ocupación_mensual = mapa
+        return mapa
+
+    def calcular_estadísticos_ocupación(self) -> dict:
+        if self.mapa_ocupación_mensual is None:
+            raise ValueError(
+                "Primero debe construirse el mapa de ocupación")
+
+        mapa = self.mapa_ocupación_mensual
+
+        promedio = float(np.mean(mapa))
+        desviación = float(np.std(mapa))
+        máximo = int(np.max(mapa))
+        mínimo = int(np.min(mapa))
+
+        posición_máxima = np.unravel_index(
+            int(np.argmax(mapa)),
+            mapa.shape
+        )
+
+        posición_mínima = np.unravel_index(
+            int(np.argmin(mapa)),
+            mapa.shape
+        )
 
         return {
-            "total_sillas_por_proyeccion": resultado_proyecciones,
-            "total_ocupaciones_por_silla": total_por_silla,
-            "total_sillas_por_zona": total_por_zona
+            "promedio": promedio,
+            "desviación_estándar": desviación,
+            "máximo": máximo,
+            "mínimo": mínimo,
+            "posición_máxima": posición_máxima,
+            "posición_mínima": posición_mínima
         }
+
+    def construir_mapa_ingresos_mensual(self) -> np.ndarray:
+        if self.mapa_ocupación_mensual is None:
+            raise ValueError(
+                "Primero debe construirse el mapa de ocupación"
+            )
+
+        precios = np.zeros(
+            (
+                self.filas,
+                self.sillas_por_fila
+            ),
+            dtype=float
+        )
+
+        for fila in range(1, self.filas + 1):
+            precio = self.precio_de_silla(fila)
+            precios[fila - 1, :] = precio
+
+        mapa_ingresos = (
+            self.mapa_ocupación_mensual * precios
+        )
+
+        self.mapa_ingresos_mensual = mapa_ingresos
+
+        return mapa_ingresos
+
+    def analizar_zonas(self) -> dict:
+        if self.mapa_ocupación_mensual is None:
+            raise ValueError(
+                "Primero debe construirse el mapa de ocupación"
+            )
+
+        if self.mapa_ingresos_mensual is None:
+            raise ValueError(
+                "Primero debe construirse el mapa de ingresos"
+            )
+
+        resultados: dict = {}
+
+        for zona, limites in FILAS_ZONAS[self.tamaño].items():
+            fila_inicial, fila_final = limites
+
+            ocupación_zona = (
+                self.mapa_ocupación_mensual[
+                    :,
+                    fila_inicial - 1:fila_final,
+                    :
+                ]
+            )
+
+            ingresos_zona = (
+                self.mapa_ingresos_mensual[
+                    :,
+                    fila_inicial - 1:fila_final,
+                    :
+                ]
+            )
+
+            cantidad_sillas = (
+                fila_final - fila_inicial + 1
+            ) * self.sillas_por_fila
+
+            ocupación_total = int(
+                np.sum(ocupación_zona)
+            )
+
+            ingresos_total = float(
+                np.sum(ingresos_zona)
+            )
+
+            resultados[zona] = {
+                "ocupación_total": ocupación_total,
+                "ocupación_promedio": (
+                    ocupación_total / cantidad_sillas
+                ),
+                "ingresos_total": ingresos_total,
+                "ingresos_promedio": (
+                    ingresos_total / cantidad_sillas
+                )
+            }
+
+        return resultados
+
+    def construir_matriz_ocupación_día(
+        self,
+        ruta_csv: str,
+        día: int
+    ) -> np.ndarray:
+        registros = self.leer_csv(ruta_csv)
+
+        registros_día: list[dict[str, str]] = []
+
+        for registro in registros:
+            día_registro = self.convertir_día(
+                registro["fecha"]
+            )
+
+            if día_registro == día:
+                registros_día.append(registro)
+
+        if len(registros_día) == 0:
+            raise ValueError(
+                f"No existen registros para el día {día}"
+            )
+
+        identificadores = sorted(
+            set(
+                (
+                    registro["fecha"],
+                    registro["proyeccion"]
+                )
+                for registro in registros_día
+            )
+        )
+
+        cantidad_proyecciones = len(identificadores)
+
+        matriz = np.zeros(
+            (
+                self.filas,
+                self.sillas_por_fila,
+                cantidad_proyecciones
+            ),
+            dtype=int
+        )
+
+        posiciones = {
+            identificador: índice
+            for índice, identificador in enumerate(identificadores)
+        }
+
+        for registro in registros_día:
+            fila = int(registro["fila"])
+            silla = int(registro["silla"])
+
+            if not self.validar_asiento(fila, silla):
+                continue
+
+            identificador = (
+                registro["fecha"],
+                registro["proyeccion"]
+            )
+
+            índice_proyección = posiciones[identificador]
+
+            matriz[
+                fila - 1,
+                silla - 1,
+                índice_proyección
+            ] = 1
+
+        self.matriz_ocupación_día = matriz
+
+        return matriz
+
+    def ocupación_por_proyección(self) -> np.ndarray:
+        if self.matriz_ocupación_día is None:
+            raise ValueError(
+                "Primero debe construirse la matriz del día"
+            )
+
+        return np.sum(
+            self.matriz_ocupación_día,
+            axis=(0, 1)
+        )
+
+    def ocupación_por_silla_en_día(self) -> np.ndarray:
+        if self.matriz_ocupación_día is None:
+            raise ValueError(
+                "Primero debe construirse la matriz del día"
+            )
+
+        return np.sum(
+            self.matriz_ocupación_día,
+            axis=2
+        )
+
+    def ocupación_por_zona_en_día(self) -> dict[str, int]:
+        if self.matriz_ocupación_día is None:
+            raise ValueError(
+                "Primero debe construirse la matriz del día"
+            )
+
+        resultados: dict[str, int] = {}
+
+        for zona, limites in FILAS_ZONAS[self.tamaño].items():
+            fila_inicial, fila_final = limites
+
+            valores = self.matriz_ocupación_día[
+                fila_inicial - 1:fila_final,
+                :,
+                :
+            ]
+
+            resultados[zona] = int(np.sum(valores))
+
+        return resultados
+
+    def ocupación_total_por_día(self) -> np.ndarray:
+        if self.mapa_ocupación_mensual is None:
+            raise ValueError(
+                "Primero debe construirse el mapa de ocupación"
+            )
+
+        return np.sum(
+            self.mapa_ocupación_mensual,
+            axis=(1, 2)
+        )
+
+    def ocupación_promedio_por_día(self) -> np.ndarray:
+        if self.mapa_ocupación_mensual is None:
+            raise ValueError(
+                "Primero debe construirse el mapa de ocupación"
+            )
+
+        return np.mean(
+            self.mapa_ocupación_mensual,
+            axis=(1, 2)
+        )
+
+    def día_más_ocupado(self) -> int:
+        totales = self.ocupación_total_por_día()
+
+        return int(np.argmax(totales)) + 1
+
+    def día_menos_ocupado(self) -> int:
+        totales = self.ocupación_total_por_día()
+
+        return int(np.argmin(totales)) + 1
+
+    def construir_matriz_demanda_sexo(
+        self,
+        ruta_csv: str
+    ) -> np.ndarray:
+        registros = self.leer_csv(ruta_csv)
+
+        días = [
+            self.convertir_día(registro["fecha"])
+            for registro in registros
+        ]
+
+        cantidad_días = max(días)
+
+        matriz = np.zeros(
+            (
+                cantidad_días,
+                4,
+                2
+            ),
+            dtype=int
+        )
+
+        posiciones_sexo = {
+            "hombre": 0,
+            "mujer": 1
+        }
+
+        zonas = (
+            "económica",
+            "premium",
+            "intermedia",
+            "última fila"
+        )
+
+        posiciones_zona = {
+            zona: índice
+            for índice, zona in enumerate(zonas)
+        }
+
+        for registro in registros:
+            día = self.convertir_día(registro["fecha"])
+            fila = int(registro["fila"])
+            sexo = registro["sexo"].strip().lower()
+
+            if not self.validar_asiento(fila, 1):
+                continue
+
+            if sexo in ("m", "masculino", "hombre"):
+                sexo = "hombre"
+            elif sexo in ("f", "femenino", "mujer"):
+                sexo = "mujer"
+            else:
+                continue
+
+            zona = self.zona_de_fila(fila)
+
+            matriz[
+                día - 1,
+                posiciones_zona[zona],
+                posiciones_sexo[sexo]
+            ] += 1
+
+        self.matriz_demanda_sexo = matriz
+
+        return matriz
+
+    def demanda_por_día(self) -> np.ndarray:
+        if self.matriz_demanda_sexo is None:
+            raise ValueError(
+                "Primero debe construirse la matriz por sexo" )
+
+        return np.sum(
+            self.matriz_demanda_sexo,
+            axis=(1, 2)
+        )
+
+    def demanda_por_zona(self) -> np.ndarray:
+        if self.matriz_demanda_sexo is None:
+            raise ValueError(
+                "Primero debe construirse la matriz por sexo"
+            )
+
+        return np.sum(
+            self.matriz_demanda_sexo,
+            axis=(0, 2)
+        )
+
+    def demanda_por_sexo(self) -> np.ndarray:
+        if self.matriz_demanda_sexo is None:
+            raise ValueError(
+                "Primero debe construirse la matriz por sexo"
+            )
+
+        return np.sum(
+            self.matriz_demanda_sexo,
+            axis=(0, 1)
+        )
+
+    def ocupación_total(self) -> int:
+        if self.mapa_ocupación_mensual is None:
+            raise ValueError(
+                "Primero debe construirse el mapa de ocupación"
+            )
+
+        return int(np.sum(self.mapa_ocupación_mensual))
+
+    def ingreso_total(self) -> float:
+        if self.mapa_ingresos_mensual is None:
+            raise ValueError(
+                "Primero debe construirse el mapa de ingresos"
+            )
+
+        return float(np.sum(self.mapa_ingresos_mensual))
+
+    def ocupación_promedio(self) -> float:
+        if self.mapa_ocupación_mensual is None:
+            raise ValueError(
+                "Primero debe construirse el mapa de ocupación"
+            )
+
+        return float(np.mean(self.mapa_ocupación_mensual))
+
+    def ingreso_promedio(self) -> float:
+        if self.mapa_ingresos_mensual is None:
+            raise ValueError(
+                "Primero debe construirse el mapa de ingresos"
+            )
+
+        return float(np.mean(self.mapa_ingresos_mensual))
